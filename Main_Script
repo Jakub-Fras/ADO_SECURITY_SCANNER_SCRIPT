@@ -1,0 +1,104 @@
+<# 
+-----------------------
+  AzSK.ADO – V1 Script (with DetailedScan enabled)
+
+  PURPOSE
+  -------
+  This script runs an Azure DevOps (ADO) security posture scan using the AzSK.ADO PowerShell module main functions:
+    - Verifies you are using PowerShell 7+ (AzSK.ADO requires .NET Core/PS 7 for best compatibility)
+    - Trusts the PowerShell Gallery and ensures the NuGet package provider is present (WHY: required so modules can be downloaded securely and without user prompts)
+    - Installs/updates the AzSK.ADO module to the latest available version (or continues offline)
+    - Accepts one or more ADO projects and scans **all supported resource types**
+    - Prompts once per session for a Personal Access Token (PAT) and reuses it (WHY: needed to authenticate against Azure DevOps API)
+    - Runs with `-DetailedScan` to provide the most verbose output - most information including control ID
+    - Automatically saves results to a default folder (AzSK.ADOLogs) created by the module
+
+  REFERENCES
+  ----------
+  - PATs (Personal Access Tokens): https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows
+  - PowerShell Gallery (getting started): https://learn.microsoft.com/en-us/powershell/gallery/getting-started?view=powershellget-3.x
+  - NuGet (what it is): https://learn.microsoft.com/en-us/nuget/what-is-nuget
+  - ADO Security Scanner (what it is): https://marketplace.visualstudio.com/items?itemName=azsdktm.ADOSecurityScanner
+
+  HOW IT WORKS (HIGH LEVEL)
+  -------------------------
+  0) Enforces PowerShell 7+ and exits early if not compliant.
+  1) Quietly sets the PSGallery repository as Trusted (WHY: prevents repeated prompts, allows silent install/update) and ensures the NuGet provider is available.
+  2) Makes sure the AzSK.ADO module exists and is up-to-date (best-effort; continues if offline/proxy).
+  3) You edit organization/project details in one place.
+  4) Reads a PAT once per session (WHY: PAT acts as your authentication token, like a password, for accessing ADO APIs).
+  5) Calls Get-AzSKADOSecurityStatus to scan *all* supported ADO resources in the specified projects with detailed output.
+
+  SECURITY NOTES
+  --------------
+  - Treat the PAT like a password; do not commit it to source control or in plane text.
+  - The script stores the PAT only in memory (current session) as a SecureString when you restart powershell you'll need to re enter the PAT.
+  - Be mindful of where reports are saved; they can contain sensitive org details.
+
+  EDITING POLICY
+  --------------
+As new updates come out i'll update the script as needed.
+-----------------------
+#>
+
+<# -----------------------
+  AzSK.ADO – Minimal V4
+  - PS7 check
+  - Module up-to-date
+  - Multiple projects
+  - PAT prompt once
+  - Scan ALL resources
+  - DetailedScan enabled
+  - Results auto-saved to AzSK.ADOLogs
+----------------------- #>
+
+# 0) Require PowerShell 7+
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+  Write-Error "PowerShell 7+ is required. Open 'PowerShell 7 (x64)' and run this script again."
+  return
+}
+
+# 1) Ensure PSGallery is trusted and NuGet provider exists (quietly)
+try { Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction Stop } catch {}
+try { Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser -ErrorAction SilentlyContinue } catch {}
+
+# 2) Make sure AzSK.ADO is installed and latest
+$required = [Version]"1.22.0"   # bump if newer stable is published
+$installed = Get-InstalledModule AzSK.ADO -ErrorAction SilentlyContinue
+if (-not $installed) {
+  Install-Module AzSK.ADO -Scope CurrentUser -Force
+} else {
+  try {
+    $available = Find-Module AzSK.ADO -ErrorAction Stop
+    if ($installed.Version -lt $available.Version) {
+      Update-Module AzSK.ADO -Force
+    }
+  } catch {
+    # offline/proxy – continue with installed version
+  }
+}
+Import-Module AzSK.ADO -Force
+
+# 3) EDIT ONLY THESE:
+$OrgName = "ENTER_YOUR_ADO_ORGANISATION_HERE E.G. DemoOrg123"  # short org name (not full URL)
+$Projects = @(
+  "Shift-Left-Project"   # add more projects here, one per line
+  # "Another-Project"
+)
+# --------------------------------
+
+# Join into comma-separated string
+$ProjectNames = ($Projects -join ",")
+
+# 4) Prompt for PAT once per session (hidden input)
+if (-not $script:ADO_PAT) {
+  $script:ADO_PAT = Read-Host "Paste PAT (input hidden)" -AsSecureString
+}
+
+# 5) Run the scan for ALL supported resource types (with DetailedScan enabled)
+Get-AzSKADOSecurityStatus `
+  -OrganizationName $OrgName `
+  -ProjectNames     $ProjectNames `
+  -ScanAllResources `
+  -PATToken         $script:ADO_PAT `
+  -DetailedScan
