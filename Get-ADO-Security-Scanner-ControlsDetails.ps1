@@ -14,23 +14,10 @@
          Install-Module AzSK.ADO -Scope CurrentUser
     3) Internet/permissions as required by your environment to install modules.
 
-.HOW TO RUN
-    1) Open PowerShell.
-    2) (Optional) If scripts are blocked, allow local scripts for this session:
-         Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-    3) Run the script:
-         .\Get-AzSKADOControlsDetails.ps1
-
 .OUTPUT
     - For each control: ControlID, Severity, full File path, Description,
       Rationale, Recommendation, Automated.
     - Printed in blocks for readability, then a single grand total line.
-
-.TIPS
-    - To save the output to a text file:
-         .\Get-AzSKADOControlsDetails.ps1 | Out-File .\AzSKADO_Controls_Report.txt -Encoding UTF8
-    - To filter highs only (pipe after running and returning objects instead of Write-Host):
-         .\Get-AzSKADOControlsDetails.ps1 | Where-Object Severity -eq 'High'
 
 .NOTES
     Author   : Jakub Fras
