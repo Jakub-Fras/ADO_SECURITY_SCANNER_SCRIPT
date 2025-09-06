@@ -3,7 +3,7 @@
     Generate a detailed, human-readable report of all AzSK.ADO controls.
 
 .DESCRIPTION
-    Uses Get-AzSKADOAllControls to enumerate controls, then opens each control’s
+    Uses Get-AzSKADOAllControls to enumerate controls, then opens each control's
     JSON file to enrich with Severity, Description, Rationale, Recommendation,
     and Automated. Output is grouped by severity (High first) and ends with a
     grand total.
@@ -27,16 +27,15 @@
     - Printed in blocks for readability, then a single grand total line.
 
 .TIPS
-    • To save the output to a text file:
+    - To save the output to a text file:
          .\Get-AzSKADOControlsDetails.ps1 | Out-File .\AzSKADO_Controls_Report.txt -Encoding UTF8
-    • To filter highs only (pipe after running and returning objects instead of Write-Host):
-         # (Modify script to output objects; see README ideas)
+    - To filter highs only (pipe after running and returning objects instead of Write-Host):
          .\Get-AzSKADOControlsDetails.ps1 | Where-Object Severity -eq 'High'
 
 .NOTES
     Author   : Jakub Fras
     Version  : 1.0
-    Purpose  : Make AzSK.ADO controls transparent and easy to document/share.
+    Purpose  : Make DevOps Security Scanner controls transparent and easy to document/share.
 #>
 
 ------------------------------------------------------------------------------SCRIPT BELOW-------------------------------------------------------------------------------------
