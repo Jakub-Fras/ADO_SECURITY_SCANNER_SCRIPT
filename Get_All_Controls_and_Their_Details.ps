@@ -1,0 +1,165 @@
+<#
+.SYNOPSIS
+    Generate a detailed, human-readable report of all AzSK.ADO controls.
+
+.DESCRIPTION
+    Uses Get-AzSKADOAllControls to enumerate controls, then opens each control’s
+    JSON file to enrich with Severity, Description, Rationale, Recommendation,
+    and Automated. Output is grouped by severity (High first) and ends with a
+    grand total.
+
+.PREREQUISITES
+    1) Windows PowerShell 5.1 or PowerShell 7+
+    2) AzSK.ADO module installed and available in your PSModulePath:
+         Install-Module AzSK.ADO -Scope CurrentUser
+    3) Internet/permissions as required by your environment to install modules.
+
+.HOW TO RUN
+    1) Open PowerShell.
+    2) (Optional) If scripts are blocked, allow local scripts for this session:
+         Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+    3) Run the script:
+         .\Get-AzSKADOControlsDetails.ps1
+
+.OUTPUT
+    - For each control: ControlID, Severity, full File path, Description,
+      Rationale, Recommendation, Automated.
+    - Printed in blocks for readability, then a single grand total line.
+
+.TIPS
+    • To save the output to a text file:
+         .\Get-AzSKADOControlsDetails.ps1 | Out-File .\AzSKADO_Controls_Report.txt -Encoding UTF8
+    • To filter highs only (pipe after running and returning objects instead of Write-Host):
+         # (Modify script to output objects; see README ideas)
+         .\Get-AzSKADOControlsDetails.ps1 | Where-Object Severity -eq 'High'
+
+.NOTES
+    Author   : Jakub Fras
+    Version  : 1.0
+    Purpose  : Make AzSK.ADO controls transparent and easy to document/share.
+#>
+
+------------------------------------------------------------------------------SCRIPT BELOW-------------------------------------------------------------------------------------
+# --------------------------
+# Get all controls from AzSK.ADO
+# --------------------------
+# This cmdlet returns metadata for each control (ControlID, File, etc.)
+# But it does not include Severity/Description/Rationale directly, so we’ll enrich it.
+$allControls = Get-AzSKADOAllControls
+
+# --------------------------
+# For each control, enrich data by reading its JSON file
+# --------------------------
+# $rows will store a collection of enriched control objects we create.
+$rows = foreach ($c in $allControls) {
+    # Default values (in case something is missing or goes wrong)
+    $sev  = "Unknown"
+    $desc = "N/A"
+    $rat  = "N/A"
+    $rec  = "N/A"
+    $auto = "N/A"
+
+    # If the control’s File property is missing or the file doesn’t exist → treat as error
+    if (-not $c.File -or -not (Test-Path -LiteralPath $c.File)) {
+        $sev = "Error"
+    }
+    else {
+        try {
+            # Load the JSON file where the control is defined
+            $json  = Get-Content -LiteralPath $c.File -Raw | ConvertFrom-Json
+
+            # Find the specific control entry inside the file that matches this ControlID
+            $match = $json.Controls | Where-Object { $_.ControlID -eq $c.ControlID }
+
+            if ($match) {
+                # Extract severity (handle both possible property names)
+                if     ($match.PSObject.Properties.Name -contains 'ControlSeverity' -and $match.ControlSeverity) {
+                    $sev = $match.ControlSeverity
+                }
+                elseif ($match.PSObject.Properties.Name -contains 'Severity' -and $match.Severity) {
+                    $sev = $match.Severity
+                }
+                else {
+                    $sev = "Unknown"
+                }
+
+                # Extract other useful fields if they exist
+                if ($match.PSObject.Properties.Name -contains 'Description')    { $desc = $match.Description }
+                if ($match.PSObject.Properties.Name -contains 'Rationale')      { $rat  = $match.Rationale }
+                if ($match.PSObject.Properties.Name -contains 'Recommendation') { $rec  = $match.Recommendation }
+                if ($match.PSObject.Properties.Name -contains 'Automated')      { $auto = $match.Automated }
+            }
+            else {
+                # Couldn’t find the ControlID inside its file → error
+                $sev = "Error"
+            }
+        }
+        catch {
+            # If parsing the JSON file fails, mark severity as "Error"
+            $sev = "Error"
+        }
+    }
+
+    # --------------------------
+    # Normalize multi-line text fields
+    # --------------------------
+    # Sometimes Description, Rationale, or Recommendation can be arrays
+    # or contain line breaks. This makes them print neatly with indentation.
+    foreach ($v in 'desc','rat','rec') {
+        # If the value is an array, join it with newlines
+        if ((Get-Variable $v -ValueOnly) -is [System.Array]) {
+            Set-Variable -Name $v -Value ((Get-Variable $v -ValueOnly) -join "`n")
+        }
+        # Replace raw newlines with indented newlines (for pretty printing)
+        Set-Variable -Name $v -Value ((Get-Variable $v -ValueOnly) -replace "`r?`n", "`n  ")
+    }
+
+    # --------------------------
+    # Create an object for each control with all enriched properties
+    # --------------------------
+    [pscustomobject]@{
+        ControlID      = $c.ControlID
+        Severity       = $sev
+        File           = $c.File
+        Description    = $desc
+        Rationale      = $rat
+        Recommendation = $rec
+        Automated      = $auto
+    }
+}
+
+# --------------------------
+# Sort order definition
+# --------------------------
+# We want to print High first, then Medium, then Low, then Unknown, then Error.
+# This hash table assigns a numeric weight to each severity level.
+$severityOrder = @{ High = 1; Medium = 2; Low = 3; Unknown = 4; Error = 5 }
+
+# --------------------------
+# Print each control in a readable format
+# --------------------------
+# We sort by severity using our custom order, then by ControlID.
+# For each control, we build a formatted text block with details.
+$rows |
+  Sort-Object @{Expression = { $severityOrder[$_.Severity] }}, ControlID |
+  ForEach-Object {
+    $block = @"
+Control : $($_.ControlID)
+Severity: $($_.Severity)
+File    : $($_.File)
+Description:
+  $($_.Description)
+Rationale:
+  $($_.Rationale)
+Recommendation:
+  $($_.Recommendation)
+Automated: $($_.Automated)
+
+"@
+    Write-Host $block
+  }
+
+# --------------------------
+# Print grand total at the end
+# --------------------------
+Write-Host ("Total number of controls: {0}" -f $rows.Count)
