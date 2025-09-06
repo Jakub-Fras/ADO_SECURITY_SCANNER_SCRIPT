@@ -1,0 +1,73 @@
+## 1. What is the MCSB?
+
+**MCSB = Microsoft Cloud Security Benchmark**
+
+It is Microsoft’s reference framework for securing workloads in Azure.
+
+Think of it as a **catalogue of security recommendations**, built from:
+- Industry standards (CIS, NIST, PCI, etc.)
+- Microsoft’s own best practices
+
+Each control in the MCSB covers a key security area:
+- Identity & access management
+- Network security
+- Data protection
+- Logging & monitoring
+- Governance
+
+**Example controls:**
+- Use MFA for all privileged accounts  
+- Enable diagnostic logging  
+- Restrict public access  
+
+---
+
+## 2. What is the “baseline”?
+
+The **baseline** is the default set of MCSB recommendations that **Microsoft Defender for Cloud** uses to evaluate your environment.
+
+- When you connect an Azure subscription, Defender automatically measures resources against the **MCSB baseline controls**.  
+- These appear as **Security Recommendations** and contribute to your **Secure Score**.  
+
+**In short:**
+- **MCSB** = the benchmark/framework itself  
+- **Baseline** = the active implementation of MCSB checks in Defender for Cloud  
+
+---
+
+## 3. How do ADO Security Scanner controls map to the MCSB?
+
+**ADO Security Scanner** is focused specifically on **Azure DevOps** security:
+- It scans pipelines, repositories, variable groups, service connections, etc.
+- Its controls are **not part of the official MCSB baseline** (which is Azure-focused, not ADO).  
+
+But conceptually, many of the scanner’s controls **align with MCSB themes**:
+- **Identity & access management** → e.g. restrict broad group access, disable inherited permissions.  
+- **Data protection** → e.g. don’t store secrets in plain text, use Key Vault integration.  
+- **Governance & monitoring** → e.g. review inactive resources, enforce branch protection.  
+
+**Example:**
+- **ADO Security Scanner control**: *“Do not make variable groups with secrets accessible to all pipelines.”*  
+- **MCSB equivalent theme**: *“Ensure secrets are stored securely and access-controlled.”*  
+
+⚠️ There is **no official 1:1 mapping** between ADO Security Scanner controls and MCSB.  
+However, you can align them manually by **category** (identity, secrets management, governance, monitoring).  
+
+
+### 4. How do these controls align with security frameworks?
+
+The ADO Security Scanner controls are not officially mapped to Microsoft Cloud Security Benchmark (MCSB) or other frameworks.  
+However, many controls **align conceptually** with widely used standards, such as:
+
+- **MCSB** → Identity, Data Protection, Logging, and Governance domains  
+- **CIS Controls v8** → Data Protection, Account Management, Secure Configuration  
+- **NIST 800-53 / CSF** → Access Control (AC), Identification & Authentication (IA), Configuration Management (CM)  
+- **ISO 27001** → Access Control, Cryptography, Operations Security  
+- **OWASP SAMM / OWASP Top 10** → Secure build & deployment, authentication and authorization practices  
+
+In short: while there’s no 1:1 official mapping, the scanner’s rules reinforce the same principles found in major cloud and security frameworks.
+
+6. How can i verify what controls the scanner checks against and their total number?
+Ensure you have the latest version of the ADO Security Scanner and run:
+Get-ADO-Security-Scanner-Control-Details.ps1 (also in the repo) 
+Keep an eye on new updates to contyrols latest being: https://github.com/azsk/ADOScanner-docs/blob/master/Release%20notes/RN220316.md
